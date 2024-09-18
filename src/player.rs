@@ -1,5 +1,6 @@
 use bevy::{prelude::*, window::PrimaryWindow};
 use num;
+use crate::bullet::*;
 
 const PLAYER_SPEED: f32 = 500.0;
 pub struct PlayerPlugin;
@@ -13,6 +14,7 @@ impl Plugin for PlayerPlugin {
             ))
             .add_systems(Update, (
                 player_movement,
+                player_shoot,
             ))
             ;
     }
@@ -77,5 +79,21 @@ fn player_movement(
 
         let window = window_query.get_single().unwrap();
         transform.translation.x = num::clamp(transform.translation.x, 0.0, window.width());
+    }
+}
+
+fn player_shoot(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    player_query: Query<&Transform, With<Player>>,
+    mut bullet_event_writer: EventWriter<BulletShotEvent>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Space) {
+        let player_position = player_query.get_single().unwrap().translation;
+        bullet_event_writer.send(
+            BulletShotEvent{
+                positon: player_position,
+                direction: Vec3::Y,
+            }
+        );
     }
 }
