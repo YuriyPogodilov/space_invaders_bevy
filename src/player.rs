@@ -3,6 +3,8 @@ use num;
 use crate::bullet::*;
 
 const PLAYER_SPEED: f32 = 500.0;
+const SHOOTING_COOLDOWN: f32 = 0.5;
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
@@ -15,6 +17,7 @@ impl Plugin for PlayerPlugin {
             .add_systems(Update, (
                 player_movement,
                 player_shoot,
+                update_cooldown,
             ))
             ;
     }
@@ -22,6 +25,9 @@ impl Plugin for PlayerPlugin {
 
 #[derive(Component)]
 struct Player {}
+
+#[derive(Component, Deref, DerefMut)]
+struct ShootingCooldown(Timer);
 
 fn spawn_player(
     mut commands: Commands,
@@ -83,17 +89,42 @@ fn player_movement(
 }
 
 fn player_shoot(
+    mut commands: Commands,
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    player_query: Query<&Transform, With<Player>>,
+    player_query: Query<(Entity, &Transform), With<Player>>,
+    cooldowns: Query<&ShootingCooldown, With<Player>>,
     mut bullet_event_writer: EventWriter<BulletShotEvent>,
 ) {
+    let (player, player_transform) = player_query.single();
+
     if keyboard_input.just_pressed(KeyCode::Space) {
-        let player_position = player_query.get_single().unwrap().translation;
-        bullet_event_writer.send(
-            BulletShotEvent{
-                positon: player_position,
-                direction: Vec3::Y,
-            }
-        );
+        if let Err(_) = cooldowns.get(player) {
+            commands
+                .entity(player)
+                .insert(
+                    ShootingCooldown(
+                        Timer::from_seconds(SHOOTING_COOLDOWN,TimerMode::Once)
+                    )
+                );
+            bullet_event_writer.send(
+                BulletShotEvent{
+                    positon: player_transform.translation,
+                    direction: Vec3::Y,
+                }
+            );
+        }
+    }
+}
+
+fn update_cooldown(
+    mut commands: Commands,
+    mut cooldowns: Query<(Entity, &mut ShootingCooldown)>,
+    time: Res<Time>,
+) {
+    for (entity, mut cooldown) in &mut cooldowns {
+        cooldown.0.tick(time.delta());
+        if cooldown.finished() { 
+            commands.entity(entity).remove::<ShootingCooldown>();
+        }
     }
 }
