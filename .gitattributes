@@ -1,5 +1,5 @@
 # Anything in `/RawContent` dir. [You create this directory in your projects root folder]
-/RawContent/**/* filter=lfs diff=lfs merge=lfs -text
+/_raw_content/**/* filter=lfs diff=lfs merge=lfs -text
 
 # Raw Content types
 *.blend filter=lfs diff=lfs merge=lfs -text

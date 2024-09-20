@@ -39,8 +39,7 @@ fn spawn_player(
     commands.spawn((
         SpriteBundle {
             texture: asset_server.load("sprites/spaceship.png"),
-            transform: Transform::from_scale(Vec3::splat(0.5))
-                .with_translation(Vec3::new(window.width() / 2.0, 64.0, 0.0)),
+            transform: Transform::from_xyz(window.width() / 2.0, 64.0, 0.0),
             ..default()
         },
         Player{}
@@ -97,7 +96,7 @@ fn player_shoot(
 ) {
     let (player, player_transform) = player_query.single();
 
-    if keyboard_input.just_pressed(KeyCode::Space) {
+    if keyboard_input.pressed(KeyCode::Space) {
         if let Err(_) = cooldowns.get(player) {
             commands
                 .entity(player)
@@ -106,9 +105,11 @@ fn player_shoot(
                         Timer::from_seconds(SHOOTING_COOLDOWN,TimerMode::Once)
                     )
                 );
+            let mut shooting_point = Vec3::from(player_transform.translation);
+            shooting_point.y += 32.0; // half of spaceship sprite
             bullet_event_writer.send(
                 BulletShotEvent{
-                    positon: player_transform.translation,
+                    positon: shooting_point,
                     direction: Vec3::Y,
                 }
             );
