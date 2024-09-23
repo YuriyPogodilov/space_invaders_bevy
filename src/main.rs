@@ -1,9 +1,11 @@
 mod player;
 mod bullet;
+mod enemy;
 
 use bevy::{prelude::*, window::WindowResolution};
 use bullet::BulletPlugin;
 use player::PlayerPlugin;
+use enemy::EnemyPlugin;
 
 fn main() {
     let app_window = Some(Window {
@@ -20,6 +22,7 @@ fn main() {
         ))
         .add_plugins(PlayerPlugin)
         .add_plugins(BulletPlugin)
+        .add_plugins(EnemyPlugin)
         .run();
 }
 
