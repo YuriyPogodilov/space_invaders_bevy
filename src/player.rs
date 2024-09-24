@@ -24,7 +24,7 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Component)]
-struct Player {}
+pub struct Player {}
 
 #[derive(Component, Deref, DerefMut)]
 struct ShootingCooldown(Timer);
@@ -123,7 +123,7 @@ fn update_cooldown(
     time: Res<Time>,
 ) {
     for (entity, mut cooldown) in &mut cooldowns {
-        cooldown.0.tick(time.delta());
+        cooldown.tick(time.delta());
         if cooldown.finished() { 
             commands.entity(entity).remove::<ShootingCooldown>();
         }
