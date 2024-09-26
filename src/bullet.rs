@@ -4,20 +4,8 @@ use bevy::{
 };
 
 const BULLET_SPEED: f32 = 800.0;
+pub const BULLET_SIZE: Vec2 = Vec2::new(6.0, 22.0);
 
-#[derive(Component)]
-struct Bullet {
-    direction: Vec2,
-}
-
-#[derive(Resource, Default)]
-struct BulletSprite(Handle<Image>);
-
-#[derive(Event)]
-pub struct BulletShotEvent {
-    pub positon: Vec2,
-    pub direction: Vec2,
-}
 pub struct BulletPlugin;
 
 impl Plugin for BulletPlugin {
@@ -33,6 +21,20 @@ impl Plugin for BulletPlugin {
             ))
         ;
     }
+}
+
+#[derive(Component)]
+pub struct Bullet {
+    direction: Vec2,
+}
+
+#[derive(Resource, Default)]
+struct BulletSprite(Handle<Image>);
+
+#[derive(Event)]
+pub struct BulletShotEvent {
+    pub positon: Vec2,
+    pub direction: Vec2,
 }
 
 fn load_resources(
@@ -58,7 +60,7 @@ fn spawn_bullet(
             },
             Bullet {
                 direction: shot_event.direction
-            }
+            },
         ));
     }
 }

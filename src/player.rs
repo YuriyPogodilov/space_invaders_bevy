@@ -2,19 +2,22 @@ use bevy::{
     math::bounding::{
         Aabb2d, 
         BoundingCircle, 
-        IntersectsVolume
+        IntersectsVolume,
     }, 
     prelude::*, 
-    window::PrimaryWindow
+    window::PrimaryWindow,
 };
 use crate::{
     bullet::*, 
-    enemy::EnemyCollider
+    enemy::*,
 };
 use num;
 
 const PLAYER_SPEED: f32 = 500.0;
 const SHOOTING_COOLDOWN: f32 = 0.5;
+const PLAYER_COLLIDER_V_SIZE: Vec2 = Vec2::new(32.0, 62.0);
+const PLAYER_COLLIDER_H_SIZE: Vec2 = Vec2::new(106.0, 18.0);
+const PLAYER_COLLIDER_H_SHIFT: Vec2 = Vec2::new(0.0, -15.0);
 
 pub struct PlayerPlugin;
 
@@ -145,35 +148,40 @@ fn update_cooldown(
 fn check_collision_with_enemy(
     mut commands: Commands,
     player_query: Query<(Entity, &Transform), With<Player>>,
-    enemy_collider: Query<&Transform, With<EnemyCollider>>,
+    enemy_collider: Query<(Entity, &Transform, &Enemy)>,
 ) {
     if let Ok((player_entity, player_transform)) = player_query.get_single() {
         let player_position = player_transform.translation.truncate();
 
         let player_box_v = Aabb2d::new(
             player_position,
-            Vec2::new(16.0, 31.0),
+            PLAYER_COLLIDER_V_SIZE / 2.0,
         );
         let player_box_h = Aabb2d::new(
-            Vec2::new(player_position.x, player_position.y - 15.0),
-            Vec2::new(53.0, 9.0),
+            player_position + PLAYER_COLLIDER_H_SHIFT,
+            PLAYER_COLLIDER_H_SIZE / 2.0,
         );
 
         let mut collided = false;
-        for enemy_transform in &enemy_collider {
-            let enemy_box = BoundingCircle::new(enemy_transform.translation.truncate(), 25.0);
+        for (enemy_entity, enemy_transform, enemy) in &enemy_collider {
+            if enemy.state != EnemyState::Kamikaze {
+                continue;
+            }
+            let enemy_box = BoundingCircle::new(
+                enemy_transform.translation.truncate(), 
+                ENEMY_COLLIDER_RADIUS
+            );
             if enemy_box.intersects(&player_box_h) {
                 collided = true;
-                break;
             }
             if enemy_box.intersects(&player_box_v) {
                 collided = true;
+            }
+            if collided {
+                commands.entity(player_entity).despawn();
+                commands.entity(enemy_entity).despawn();
                 break;
             }
-        }
-
-        if collided {
-            commands.entity(player_entity).despawn();
         }
     }
 }

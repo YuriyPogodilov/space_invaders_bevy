@@ -1,12 +1,27 @@
-use  bevy::{prelude::*, window::PrimaryWindow};
+use  bevy::{
+    math::bounding::{
+        Aabb2d,
+        BoundingCircle, 
+        IntersectsVolume,
+    }, 
+    prelude::*, 
+    window::PrimaryWindow,
+};
 use rand::seq::IteratorRandom;
-use crate::player::Player;
+use crate::{
+    bullet::{
+        Bullet, 
+        BULLET_SIZE
+    }, 
+    player::Player
+};
 
 const ENEMIES_PER_WAVE: u32 = 16;
 const ENEMIES_PER_ROW: u32 = 8;
 const ENEMY_SIZE: f32 = 64.0;
 const ENEMY_SPEED: f32 = 200.0;
 const KAMIKAZE_TIMER: f32 = 5.0;
+pub const ENEMY_COLLIDER_RADIUS: f32 = 25.0;
 
 pub struct EnemyPlugin;
 
@@ -20,20 +35,21 @@ impl Plugin for EnemyPlugin {
                 update_kamikaze_timer,
                 return_to_base,
                 back_to_idle,
+                check_collision_with_bullet,
             ))
             ;
     }
 }
 
 #[derive(Component)]
-struct Enemy {
-    state: EnemyState,
+pub struct Enemy {
+    pub state: EnemyState,
     base_position: Vec2,
     direction: Vec2,
 }
 
 #[derive(Eq, PartialEq)]
-enum EnemyState {
+pub enum EnemyState {
     Idle,
     Kamikaze,
     ReturningToBase,
@@ -42,14 +58,10 @@ enum EnemyState {
 #[derive(Component, Deref, DerefMut)]
 struct KamikazeTimer(Timer);
 
-#[derive(Component)]
-pub struct EnemyCollider;
-
 #[derive(Bundle)]
 struct EnemyBundle {
     data: Enemy,
     sprite: SpriteBundle,
-    collider: EnemyCollider,
 }
 
 impl EnemyBundle {
@@ -65,7 +77,6 @@ impl EnemyBundle {
                 texture: texture.clone(),
                 ..default()
             },
-            collider: EnemyCollider,
         }
     }
 }
@@ -114,17 +125,17 @@ fn kamikaze_attack(
 
     if let Ok(player_transform) = player_query.get_single() {
         let mut rng = rand::thread_rng();
-        let (entity, transform, mut enemy) = enemy_query.iter_mut().choose(&mut rng).unwrap();
+        if let Some((entity, transform, mut enemy)) = enemy_query.iter_mut().choose(&mut rng) {
+            if enemy.state != EnemyState::Idle {
+                return;
+            }
 
-        if enemy.state != EnemyState::Idle {
-            return;
+            enemy.direction = (player_transform.translation.truncate() - transform.translation.truncate()).normalize();
+            enemy.state = EnemyState::Kamikaze;
+            commands.entity(entity).insert(KamikazeTimer(
+                Timer::from_seconds(KAMIKAZE_TIMER, TimerMode::Once),
+            ));
         }
-
-        enemy.direction = (player_transform.translation.truncate() - transform.translation.truncate()).normalize();
-        enemy.state = EnemyState::Kamikaze;
-        commands.entity(entity).insert(KamikazeTimer(
-            Timer::from_seconds(KAMIKAZE_TIMER, TimerMode::Once),
-        ));
     }
 }
 
@@ -171,6 +182,31 @@ fn back_to_idle(
             transform.translation = enemy.base_position.extend(0.0);
             enemy.direction = Vec2::ZERO;
             enemy.state = EnemyState::Idle;
+        }
+    }
+}
+
+fn check_collision_with_bullet(
+    mut commands: Commands,
+    bullet_query: Query<(Entity, &Transform), With<Bullet>>,
+    enemy_query: Query<(Entity, &Transform), With<Enemy>>,
+) {
+    for (bullet_entity, bullet_transforom) in &bullet_query {
+        for (enemy_entity, enemy_transform) in &enemy_query {
+            let enemy_box = BoundingCircle::new(
+                enemy_transform.translation.truncate(), 
+                ENEMY_COLLIDER_RADIUS
+            );
+            let bullet_box = Aabb2d::new(
+                bullet_transforom.translation.truncate(), 
+                BULLET_SIZE / 2.0,
+            );
+            
+            if enemy_box.intersects(&bullet_box) {
+                commands.entity(bullet_entity).despawn();
+                commands.entity(enemy_entity).despawn();
+                break;
+            }
         }
     }
 }
