@@ -1,10 +1,13 @@
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::{
+    prelude::*, 
+    window::PrimaryWindow
+};
 
 const BULLET_SPEED: f32 = 800.0;
 
 #[derive(Component)]
 struct Bullet {
-    direction: Vec3,
+    direction: Vec2,
 }
 
 #[derive(Resource, Default)]
@@ -12,8 +15,8 @@ struct BulletSprite(Handle<Image>);
 
 #[derive(Event)]
 pub struct BulletShotEvent {
-    pub positon: Vec3,
-    pub direction: Vec3,
+    pub positon: Vec2,
+    pub direction: Vec2,
 }
 pub struct BulletPlugin;
 
@@ -49,7 +52,7 @@ fn spawn_bullet(
     for shot_event in bullet_shot_event_reader.read() {
         commands.spawn((
             SpriteBundle {
-                transform: Transform::from_translation(shot_event.positon),
+                transform: Transform::from_translation(shot_event.positon.extend(0.0)),
                 texture: bullet_sprite.0.clone(),
                 ..default()
             },
@@ -65,7 +68,7 @@ fn bullet_movement(
     time: Res<Time>,
 ) {
     for (mut bullet_transform, bullet) in bullet_query.iter_mut() {
-        bullet_transform.translation += bullet.direction * BULLET_SPEED * time.delta_seconds();
+        bullet_transform.translation += bullet.direction.extend(0.0) * BULLET_SPEED * time.delta_seconds();
     }
 }
 

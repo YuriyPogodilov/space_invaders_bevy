@@ -28,8 +28,8 @@ impl Plugin for EnemyPlugin {
 #[derive(Component)]
 struct Enemy {
     state: EnemyState,
-    base_position: Vec3,
-    direction: Vec3,
+    base_position: Vec2,
+    direction: Vec2,
 }
 
 #[derive(Eq, PartialEq)]
@@ -41,6 +41,34 @@ enum EnemyState {
 
 #[derive(Component, Deref, DerefMut)]
 struct KamikazeTimer(Timer);
+
+#[derive(Component)]
+pub struct EnemyCollider;
+
+#[derive(Bundle)]
+struct EnemyBundle {
+    data: Enemy,
+    sprite: SpriteBundle,
+    collider: EnemyCollider,
+}
+
+impl EnemyBundle {
+    fn new(position: Vec2, texture: Handle<Image>) -> EnemyBundle {
+        EnemyBundle {
+            data: Enemy{
+                state: EnemyState::Idle,
+                base_position: position,
+                direction: Vec2::ZERO,
+            },
+            sprite: SpriteBundle{
+                transform: Transform::from_translation(position.extend(0.0)),
+                texture: texture.clone(),
+                ..default()
+            },
+            collider: EnemyCollider,
+        }
+    }
+}
 
 fn spawn_enemies(
     mut commands: Commands,
@@ -55,18 +83,11 @@ fn spawn_enemies(
         let row = n / ENEMIES_PER_ROW;
         let x = begin_x + 2.0 * ENEMY_SIZE * (n - ENEMIES_PER_ROW * row) as f32;
         let y = begin_y - ENEMY_SIZE * row as f32;
-        commands.spawn((
-            SpriteBundle{
-                transform: Transform::from_xyz(x, y, 0.0),
-                texture: asset_server.load("sprites/enemy.png"),
-                ..default()
-            },
-            Enemy{
-                state: EnemyState::Idle,
-                base_position: Vec3::new(x, y, 0.0),
-                direction: Vec3::ZERO,
-            }
-        ));
+        commands.spawn(
+            EnemyBundle::new(
+                Vec2::new(x, y), 
+                asset_server.load("sprites/enemy.png")
+            ));
     }
 }
 
@@ -75,8 +96,8 @@ fn enemy_movement(
     time: Res<Time>,
 ) {
     for (mut transform, enemy) in enemy_query.iter_mut() {
-        if enemy.direction != Vec3::ZERO {
-            transform.translation += enemy.direction * ENEMY_SPEED * time.delta_seconds();
+        if enemy.direction != Vec2::ZERO {
+            transform.translation += enemy.direction.extend(0.0) * ENEMY_SPEED * time.delta_seconds();
         }
     }
 }
@@ -91,19 +112,20 @@ fn kamikaze_attack(
         return;
     }
 
-    let mut rng = rand::thread_rng();
-    let (entity, transform, mut enemy) = enemy_query.iter_mut().choose(&mut rng).unwrap();
+    if let Ok(player_transform) = player_query.get_single() {
+        let mut rng = rand::thread_rng();
+        let (entity, transform, mut enemy) = enemy_query.iter_mut().choose(&mut rng).unwrap();
 
-    if enemy.state != EnemyState::Idle {
-        return;
+        if enemy.state != EnemyState::Idle {
+            return;
+        }
+
+        enemy.direction = (player_transform.translation.truncate() - transform.translation.truncate()).normalize();
+        enemy.state = EnemyState::Kamikaze;
+        commands.entity(entity).insert(KamikazeTimer(
+            Timer::from_seconds(KAMIKAZE_TIMER, TimerMode::Once),
+        ));
     }
-
-    let player_transform = player_query.get_single().unwrap();
-    enemy.direction = (player_transform.translation - transform.translation).normalize();
-    enemy.state = EnemyState::Kamikaze;
-    commands.entity(entity).insert(KamikazeTimer(
-        Timer::from_seconds(KAMIKAZE_TIMER, TimerMode::Once),
-    ));
 }
 
 fn update_kamikaze_timer(
@@ -129,7 +151,7 @@ fn return_to_base(
         }
         if transform.translation.y < -100.0 {
             transform.translation.y = window.height() + 100.0;
-            enemy.direction = (enemy.base_position - transform.translation).normalize();
+            enemy.direction = (enemy.base_position - transform.translation.truncate()).normalize();
             enemy.state = EnemyState::ReturningToBase;
         }
     }
@@ -143,11 +165,11 @@ fn back_to_idle(
             continue;
         }
 
-        let distance = transform.translation.distance(enemy.base_position);
+        let distance = transform.translation.distance(enemy.base_position.extend(0.0));
         // TODO: Might not work on low fps. Needs a better solution
         if distance < 3.0 {
-            transform.translation = enemy.base_position;
-            enemy.direction = Vec3::ZERO;
+            transform.translation = enemy.base_position.extend(0.0);
+            enemy.direction = Vec2::ZERO;
             enemy.state = EnemyState::Idle;
         }
     }

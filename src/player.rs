@@ -1,6 +1,17 @@
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::{
+    math::bounding::{
+        Aabb2d, 
+        BoundingCircle, 
+        IntersectsVolume
+    }, 
+    prelude::*, 
+    window::PrimaryWindow
+};
+use crate::{
+    bullet::*, 
+    enemy::EnemyCollider
+};
 use num;
-use crate::bullet::*;
 
 const PLAYER_SPEED: f32 = 500.0;
 const SHOOTING_COOLDOWN: f32 = 0.5;
@@ -18,13 +29,14 @@ impl Plugin for PlayerPlugin {
                 player_movement,
                 player_shoot,
                 update_cooldown,
+                check_collision_with_enemy,
             ))
             ;
     }
 }
 
 #[derive(Component)]
-pub struct Player {}
+pub struct Player;
 
 #[derive(Component, Deref, DerefMut)]
 struct ShootingCooldown(Timer);
@@ -42,7 +54,7 @@ fn spawn_player(
             transform: Transform::from_xyz(window.width() / 2.0, 64.0, 0.0),
             ..default()
         },
-        Player{}
+        Player,
     ));
 }
 
@@ -94,25 +106,25 @@ fn player_shoot(
     cooldowns: Query<&ShootingCooldown, With<Player>>,
     mut bullet_event_writer: EventWriter<BulletShotEvent>,
 ) {
-    let (player, player_transform) = player_query.single();
-
-    if keyboard_input.pressed(KeyCode::Space) {
-        if let Err(_) = cooldowns.get(player) {
-            commands
-                .entity(player)
-                .insert(
-                    ShootingCooldown(
-                        Timer::from_seconds(SHOOTING_COOLDOWN,TimerMode::Once)
-                    )
+    if let Ok((player, player_transform)) = player_query.get_single() {
+        if keyboard_input.pressed(KeyCode::Space) {
+            if let Err(_) = cooldowns.get(player) {
+                commands
+                    .entity(player)
+                    .insert(
+                        ShootingCooldown(
+                            Timer::from_seconds(SHOOTING_COOLDOWN,TimerMode::Once)
+                        )
+                    );
+                let mut shooting_point = Vec3::from(player_transform.translation).truncate();
+                shooting_point.y += 32.0; // half of spaceship sprite
+                bullet_event_writer.send(
+                    BulletShotEvent{
+                        positon: shooting_point,
+                        direction: Vec2::Y,
+                    }
                 );
-            let mut shooting_point = Vec3::from(player_transform.translation);
-            shooting_point.y += 32.0; // half of spaceship sprite
-            bullet_event_writer.send(
-                BulletShotEvent{
-                    positon: shooting_point,
-                    direction: Vec3::Y,
-                }
-            );
+            }
         }
     }
 }
@@ -126,6 +138,42 @@ fn update_cooldown(
         cooldown.tick(time.delta());
         if cooldown.finished() { 
             commands.entity(entity).remove::<ShootingCooldown>();
+        }
+    }
+}
+
+fn check_collision_with_enemy(
+    mut commands: Commands,
+    player_query: Query<(Entity, &Transform), With<Player>>,
+    enemy_collider: Query<&Transform, With<EnemyCollider>>,
+) {
+    if let Ok((player_entity, player_transform)) = player_query.get_single() {
+        let player_position = player_transform.translation.truncate();
+
+        let player_box_v = Aabb2d::new(
+            player_position,
+            Vec2::new(16.0, 31.0),
+        );
+        let player_box_h = Aabb2d::new(
+            Vec2::new(player_position.x, player_position.y - 15.0),
+            Vec2::new(53.0, 9.0),
+        );
+
+        let mut collided = false;
+        for enemy_transform in &enemy_collider {
+            let enemy_box = BoundingCircle::new(enemy_transform.translation.truncate(), 25.0);
+            if enemy_box.intersects(&player_box_h) {
+                collided = true;
+                break;
+            }
+            if enemy_box.intersects(&player_box_v) {
+                collided = true;
+                break;
+            }
+        }
+
+        if collided {
+            commands.entity(player_entity).despawn();
         }
     }
 }
