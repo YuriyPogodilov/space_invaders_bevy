@@ -22,8 +22,8 @@ const ENEMIES_PER_WAVE: u32 = 16;
 const ENEMIES_PER_ROW: u32 = 8;
 const ENEMY_SIZE: f32 = 64.0;
 const ENEMY_SPEED: f32 = 200.0;
-const KAMIKAZE_TIMER: f32 = 8.0;
-const SHOOTING_TIMER: f32 = 5.0;
+const KAMIKAZE_TIMER: f32 = 5.0;
+const SHOOTING_TIMER: f32 = 3.0;
 pub const ENEMY_COLLIDER_RADIUS: f32 = 25.0;
 
 pub struct EnemyPlugin;

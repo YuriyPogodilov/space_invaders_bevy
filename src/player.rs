@@ -9,7 +9,9 @@ use bevy::{
 };
 use crate::{
     bullet::{
+        Bullet,
         BulletShotEvent,
+        BULLET_SIZE,
         Instigator,
     },
     enemy::{
@@ -41,6 +43,7 @@ impl Plugin for PlayerPlugin {
                 player_shoot,
                 update_cooldown,
                 check_collision_with_enemy,
+                check_collision_with_bullet,
             ))
             ;
     }
@@ -189,6 +192,49 @@ fn check_collision_with_enemy(
             if collided {
                 commands.entity(player_entity).despawn();
                 commands.entity(enemy_entity).despawn();
+                break;
+            }
+        }
+    }
+}
+
+fn check_collision_with_bullet(
+    mut commands: Commands,
+    bullet_query: Query<(Entity, &Transform, &Bullet)>,
+    player_query: Query<(Entity, &Transform), With<Player>>,
+) {
+    if let Ok((player_entity, player_transform)) = player_query.get_single() {
+        let player_position = player_transform.translation.truncate();
+
+        let player_box_v = Aabb2d::new(
+            player_position,
+            PLAYER_COLLIDER_V_SIZE / 2.0,
+        );
+        let player_box_h = Aabb2d::new(
+            player_position + PLAYER_COLLIDER_H_SHIFT,
+            PLAYER_COLLIDER_H_SIZE / 2.0,
+        );
+
+        for (bullet_entity, bullet_transforom, bullet) in &bullet_query {
+            if bullet.instigator == Instigator::Player {
+                continue;
+            }
+
+            let bullet_box = Aabb2d::new(
+                bullet_transforom.translation.truncate(), 
+                BULLET_SIZE / 2.0,
+            );
+
+            let mut collided = false;
+            if bullet_box.intersects(&player_box_h) {
+                collided = true;
+            }
+            if bullet_box.intersects(&player_box_v) {
+                collided = true;
+            }
+            if collided {
+                commands.entity(player_entity).despawn();
+                commands.entity(bullet_entity).despawn();
                 break;
             }
         }
