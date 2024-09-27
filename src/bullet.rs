@@ -25,6 +25,7 @@ impl Plugin for BulletPlugin {
 
 #[derive(Component)]
 pub struct Bullet {
+    pub instigator: Instigator,
     direction: Vec2,
 }
 
@@ -33,8 +34,15 @@ struct BulletSprite(Handle<Image>);
 
 #[derive(Event)]
 pub struct BulletShotEvent {
+    pub instigator: Instigator,
     pub positon: Vec2,
     pub direction: Vec2,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Instigator {
+    Player,
+    Enemy,
 }
 
 fn load_resources(
@@ -59,7 +67,8 @@ fn spawn_bullet(
                 ..default()
             },
             Bullet {
-                direction: shot_event.direction
+                instigator: shot_event.instigator,
+                direction: shot_event.direction,
             },
         ));
     }

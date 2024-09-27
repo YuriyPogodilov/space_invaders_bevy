@@ -1,3 +1,4 @@
+use rand::seq::IteratorRandom;
 use  bevy::{
     math::bounding::{
         Aabb2d,
@@ -7,20 +8,22 @@ use  bevy::{
     prelude::*, 
     window::PrimaryWindow,
 };
-use rand::seq::IteratorRandom;
 use crate::{
     bullet::{
         Bullet, 
-        BULLET_SIZE
+        BulletShotEvent,
+        BULLET_SIZE,
+        Instigator,
     }, 
-    player::Player
+    player::Player,
 };
 
 const ENEMIES_PER_WAVE: u32 = 16;
 const ENEMIES_PER_ROW: u32 = 8;
 const ENEMY_SIZE: f32 = 64.0;
 const ENEMY_SPEED: f32 = 200.0;
-const KAMIKAZE_TIMER: f32 = 5.0;
+const KAMIKAZE_TIMER: f32 = 8.0;
+const SHOOTING_TIMER: f32 = 5.0;
 pub const ENEMY_COLLIDER_RADIUS: f32 = 25.0;
 
 pub struct EnemyPlugin;
@@ -28,11 +31,13 @@ pub struct EnemyPlugin;
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app
+            .init_resource::<KamikazeTimer>()
+            .init_resource::<ShootingTimer>()
             .add_systems(Startup, spawn_enemies)
             .add_systems(Update, (
                 enemy_movement,
-                kamikaze_attack,
                 update_kamikaze_timer,
+                update_shooting_timer,
                 return_to_base,
                 back_to_idle,
                 check_collision_with_bullet,
@@ -55,8 +60,27 @@ pub enum EnemyState {
     ReturningToBase,
 }
 
-#[derive(Component, Deref, DerefMut)]
+#[derive(Resource, Deref, DerefMut)]
 struct KamikazeTimer(Timer);
+
+impl Default for KamikazeTimer {
+    fn default() -> Self {
+        KamikazeTimer(
+            Timer::from_seconds(KAMIKAZE_TIMER, TimerMode::Repeating),
+        )
+    }
+}
+
+#[derive(Resource, Deref, DerefMut)]
+struct ShootingTimer(Timer);
+
+impl Default for ShootingTimer {
+   fn default() -> Self {
+        ShootingTimer(
+            Timer::from_seconds(SHOOTING_TIMER, TimerMode::Repeating),
+        )
+   } 
+}
 
 #[derive(Bundle)]
 struct EnemyBundle {
@@ -113,40 +137,43 @@ fn enemy_movement(
     }
 }
 
-fn kamikaze_attack(
-    mut commands: Commands,
-    mut enemy_query: Query<(Entity, &Transform, &mut Enemy)>,
-    cooldowns: Query<&KamikazeTimer, With<Enemy>>,
+fn update_kamikaze_timer(
+    mut enemy_query: Query<(&Transform, &mut Enemy)>,
     player_query: Query<&Transform, With<Player>>,
+    mut kamikazer_timer: ResMut<KamikazeTimer>,
+    time: Res<Time>,
 ) {
-    if !cooldowns.is_empty() {
-        return;
-    }
+    if kamikazer_timer.tick(time.delta()).just_finished() {
+        if let Ok(player_transform) = player_query.get_single() {
+            let mut rng = rand::thread_rng();
+            if let Some((enemy_transform, mut enemy)) = enemy_query.iter_mut().choose(&mut rng) {
+                if enemy.state != EnemyState::Idle {
+                    return;
+                }
 
-    if let Ok(player_transform) = player_query.get_single() {
-        let mut rng = rand::thread_rng();
-        if let Some((entity, transform, mut enemy)) = enemy_query.iter_mut().choose(&mut rng) {
-            if enemy.state != EnemyState::Idle {
-                return;
+                enemy.direction = (player_transform.translation.truncate() - enemy_transform.translation.truncate()).normalize();
+                enemy.state = EnemyState::Kamikaze;
             }
-
-            enemy.direction = (player_transform.translation.truncate() - transform.translation.truncate()).normalize();
-            enemy.state = EnemyState::Kamikaze;
-            commands.entity(entity).insert(KamikazeTimer(
-                Timer::from_seconds(KAMIKAZE_TIMER, TimerMode::Once),
-            ));
         }
     }
 }
 
-fn update_kamikaze_timer(
-    mut commands: Commands,
-    mut timers_query: Query<(Entity, &mut KamikazeTimer)>,
+fn update_shooting_timer(
+    enemy_query: Query<&Transform, With<Enemy>>,
+    mut bullet_event_writer: EventWriter<BulletShotEvent>,
+    mut shooting_timer: ResMut<ShootingTimer>,
     time: Res<Time>,
 ) {
-    for (entity, mut timer) in &mut timers_query {
-        if timer.tick(time.delta()).just_finished() {
-            commands.entity(entity).remove::<KamikazeTimer>();
+    if shooting_timer.tick(time.delta()).just_finished() {
+        let mut rng = rand::thread_rng();
+        if let Some(enemy_transform) = enemy_query.iter().choose(&mut rng) {
+            let mut shooting_point = enemy_transform.translation.truncate();
+            shooting_point.y -= ENEMY_SIZE / 2.0 + 1.0;
+            bullet_event_writer.send(BulletShotEvent{
+                instigator: Instigator::Enemy,
+                positon: shooting_point,
+                direction: Vec2::NEG_Y,
+            });
         }
     }
 }
@@ -188,10 +215,13 @@ fn back_to_idle(
 
 fn check_collision_with_bullet(
     mut commands: Commands,
-    bullet_query: Query<(Entity, &Transform), With<Bullet>>,
+    bullet_query: Query<(Entity, &Transform, &Bullet)>,
     enemy_query: Query<(Entity, &Transform), With<Enemy>>,
 ) {
-    for (bullet_entity, bullet_transforom) in &bullet_query {
+    for (bullet_entity, bullet_transforom, bullet) in &bullet_query {
+        if bullet.instigator == Instigator::Enemy {
+            continue;
+        }
         for (enemy_entity, enemy_transform) in &enemy_query {
             let enemy_box = BoundingCircle::new(
                 enemy_transform.translation.truncate(), 

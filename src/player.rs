@@ -8,13 +8,21 @@ use bevy::{
     window::PrimaryWindow,
 };
 use crate::{
-    bullet::*, 
-    enemy::*,
+    bullet::{
+        BulletShotEvent,
+        Instigator,
+    },
+    enemy::{
+        Enemy,
+        EnemyState,
+        ENEMY_COLLIDER_RADIUS,
+    },
 };
 use num;
 
 const PLAYER_SPEED: f32 = 500.0;
 const SHOOTING_COOLDOWN: f32 = 0.5;
+const PLAYER_SIZE: Vec2 = Vec2::new(108.0, 64.0);
 const PLAYER_COLLIDER_V_SIZE: Vec2 = Vec2::new(32.0, 62.0);
 const PLAYER_COLLIDER_H_SIZE: Vec2 = Vec2::new(106.0, 18.0);
 const PLAYER_COLLIDER_H_SHIFT: Vec2 = Vec2::new(0.0, -15.0);
@@ -120,9 +128,10 @@ fn player_shoot(
                         )
                     );
                 let mut shooting_point = Vec3::from(player_transform.translation).truncate();
-                shooting_point.y += 32.0; // half of spaceship sprite
+                shooting_point.y += PLAYER_SIZE.y / 2.0 + 1.0;
                 bullet_event_writer.send(
                     BulletShotEvent{
+                        instigator: Instigator::Player,
                         positon: shooting_point,
                         direction: Vec2::Y,
                     }
