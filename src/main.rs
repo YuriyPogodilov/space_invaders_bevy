@@ -2,12 +2,14 @@ mod player;
 mod bullet;
 mod enemy;
 mod game;
+mod sound;
 
 use bevy::{prelude::*, window::WindowResolution};
 use bullet::BulletPlugin;
 use player::PlayerPlugin;
 use enemy::EnemyPlugin;
 use game::GamePlugin;
+use sound::SoundPlugin;
 
 fn main() {
     let app_window = Some(Window {
@@ -22,6 +24,7 @@ fn main() {
                 ..default()
             }
         ))
+        .add_plugins(SoundPlugin)
         .add_plugins(PlayerPlugin)
         .add_plugins(BulletPlugin)
         .add_plugins(EnemyPlugin)

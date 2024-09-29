@@ -1,5 +1,5 @@
 use rand::seq::IteratorRandom;
-use  bevy::{
+use bevy::{
     math::bounding::{
         Aabb2d,
         BoundingCircle, 
@@ -33,6 +33,7 @@ impl Plugin for EnemyPlugin {
         app
             .init_resource::<KamikazeTimer>()
             .init_resource::<ShootingTimer>()
+            .add_event::<EnemyEvent>()
             .add_systems(Startup, spawn_enemies)
             .add_systems(Update, (
                 enemy_movement,
@@ -41,6 +42,7 @@ impl Plugin for EnemyPlugin {
                 return_to_base,
                 back_to_idle,
                 check_collision_with_bullet,
+                listen_enemy_event,
             ))
             ;
     }
@@ -58,6 +60,11 @@ pub enum EnemyState {
     Idle,
     Kamikaze,
     ReturningToBase,
+}
+
+#[derive(Event)]
+pub enum EnemyEvent {
+    Died(Entity),
 }
 
 #[derive(Resource, Deref, DerefMut)]
@@ -217,6 +224,7 @@ fn check_collision_with_bullet(
     mut commands: Commands,
     bullet_query: Query<(Entity, &Transform, &Bullet)>,
     enemy_query: Query<(Entity, &Transform), With<Enemy>>,
+    mut enemy_event_writer: EventWriter<EnemyEvent>,
 ) {
     for (bullet_entity, bullet_transforom, bullet) in &bullet_query {
         if bullet.instigator == Instigator::Enemy {
@@ -234,9 +242,22 @@ fn check_collision_with_bullet(
             
             if enemy_box.intersects(&bullet_box) {
                 commands.entity(bullet_entity).despawn();
-                commands.entity(enemy_entity).despawn();
+                enemy_event_writer.send(EnemyEvent::Died(enemy_entity));
                 break;
             }
+        }
+    }
+}
+
+fn listen_enemy_event(
+    mut commands: Commands,
+    mut enemy_event_listener: EventReader<EnemyEvent>,
+) {
+    for enemy in enemy_event_listener.read() {
+        match enemy {
+            EnemyEvent::Died(entity) => {
+                commands.entity(*entity).despawn();
+            },
         }
     }
 }

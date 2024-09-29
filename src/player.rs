@@ -34,6 +34,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
+            .add_event::<PlayerEvent>()
             .add_systems(Startup, (
                 spawn_camera,
                 spawn_player,
@@ -44,6 +45,7 @@ impl Plugin for PlayerPlugin {
                 update_cooldown,
                 check_collision_with_enemy,
                 check_collision_with_bullet,
+                listen_player_event,
             ))
             ;
     }
@@ -54,6 +56,11 @@ pub struct Player;
 
 #[derive(Component, Deref, DerefMut)]
 struct ShootingCooldown(Timer);
+
+#[derive(Event)]
+pub enum PlayerEvent {
+    Died,
+}
 
 fn spawn_player(
     mut commands: Commands,
@@ -159,10 +166,11 @@ fn update_cooldown(
 
 fn check_collision_with_enemy(
     mut commands: Commands,
-    player_query: Query<(Entity, &Transform), With<Player>>,
+    player_query: Query<&Transform, With<Player>>,
     enemy_collider: Query<(Entity, &Transform, &Enemy)>,
+    mut player_event_writer: EventWriter<PlayerEvent>,
 ) {
-    if let Ok((player_entity, player_transform)) = player_query.get_single() {
+    if let Ok(player_transform) = player_query.get_single() {
         let player_position = player_transform.translation.truncate();
 
         let player_box_v = Aabb2d::new(
@@ -190,7 +198,7 @@ fn check_collision_with_enemy(
                 collided = true;
             }
             if collided {
-                commands.entity(player_entity).despawn();
+                player_event_writer.send(PlayerEvent::Died);
                 commands.entity(enemy_entity).despawn();
                 break;
             }
@@ -201,9 +209,10 @@ fn check_collision_with_enemy(
 fn check_collision_with_bullet(
     mut commands: Commands,
     bullet_query: Query<(Entity, &Transform, &Bullet)>,
-    player_query: Query<(Entity, &Transform), With<Player>>,
+    player_query: Query<&Transform, With<Player>>,
+    mut player_event_writer: EventWriter<PlayerEvent>,
 ) {
-    if let Ok((player_entity, player_transform)) = player_query.get_single() {
+    if let Ok(player_transform) = player_query.get_single() {
         let player_position = player_transform.translation.truncate();
 
         let player_box_v = Aabb2d::new(
@@ -233,10 +242,26 @@ fn check_collision_with_bullet(
                 collided = true;
             }
             if collided {
-                commands.entity(player_entity).despawn();
+                player_event_writer.send(PlayerEvent::Died);
                 commands.entity(bullet_entity).despawn();
                 break;
             }
         }
     }
 }
+
+fn listen_player_event(
+    mut commands: Commands,
+    player_query: Query<Entity, With<Player>>,
+    mut player_event_listener: EventReader<PlayerEvent>,
+) {
+    for event in player_event_listener.read() {
+        match event {
+            PlayerEvent::Died => {
+                if let Ok(player_entity) = player_query.get_single() {
+                    commands.entity(player_entity).despawn();
+                }
+            },
+        }
+    }
+}            
