@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-
-use crate::{
+use crate::AppState;
+use crate::game::{
     bullet::{
         BulletShotEvent, 
         Instigator
@@ -19,7 +19,7 @@ impl Plugin for SoundPlugin {
                 listen_player_event,
                 listen_enemy_event,
                 listen_bullet_event,
-            ))
+            ).run_if(in_state(AppState::InGame)))
         ;
     }
 }

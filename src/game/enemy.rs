@@ -8,7 +8,8 @@ use bevy::{
     prelude::*, 
     window::PrimaryWindow,
 };
-use crate::{
+use crate::AppState;
+use crate::game::{
     bullet::{
         Bullet, 
         BulletShotEvent,
@@ -34,7 +35,8 @@ impl Plugin for EnemyPlugin {
             .init_resource::<KamikazeTimer>()
             .init_resource::<ShootingTimer>()
             .add_event::<EnemyEvent>()
-            .add_systems(Startup, spawn_enemies)
+            .add_systems(OnEnter(AppState::InGame), spawn_enemies)
+            .add_systems(OnExit(AppState::InGame), despawn_enemies)
             .add_systems(Update, (
                 enemy_movement,
                 update_kamikaze_timer,
@@ -43,7 +45,7 @@ impl Plugin for EnemyPlugin {
                 back_to_idle,
                 check_collision_with_bullet,
                 listen_enemy_event,
-            ))
+            ).run_if(in_state(AppState::InGame)))
             ;
     }
 }
@@ -130,6 +132,15 @@ fn spawn_enemies(
                 Vec2::new(x, y), 
                 asset_server.load("sprites/enemy.png")
             ));
+    }
+}
+
+fn despawn_enemies(
+    mut commands: Commands,
+    enemy_query: Query<Entity, With<Enemy>>,
+) {
+    for enemy_entity in enemy_query.iter() {
+        commands.entity(enemy_entity).despawn();
     }
 }
 

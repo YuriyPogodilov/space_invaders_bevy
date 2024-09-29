@@ -2,6 +2,7 @@ use bevy::{
     prelude::*, 
     window::PrimaryWindow
 };
+use crate::AppState;
 
 const BULLET_SPEED: f32 = 800.0;
 pub const BULLET_SIZE: Vec2 = Vec2::new(6.0, 22.0);
@@ -13,12 +14,13 @@ impl Plugin for BulletPlugin {
         app
             .init_resource::<BulletSprite>()
             .add_event::<BulletShotEvent>()
-            .add_systems(Startup, load_resources)
+            .add_systems(OnEnter(AppState::InGame), load_resources)
+            .add_systems(OnExit(AppState::InGame), destroy_all_bullets)
             .add_systems(Update, (
                 spawn_bullet,
                 bullet_movement,
                 destroy_bullets,
-            ))
+            ).run_if(in_state(AppState::InGame)))
         ;
     }
 }
@@ -95,4 +97,13 @@ fn destroy_bullets(
             commands.entity(bullet_entity).despawn();
         }
     }
+}
+
+fn destroy_all_bullets(
+    mut commands: Commands,
+    bullet_query: Query<Entity, With<Bullet>>,
+) {
+    for bullet_entity in bullet_query.iter() {
+        commands.entity(bullet_entity).despawn();
+    } 
 }

@@ -7,7 +7,8 @@ use bevy::{
     prelude::*, 
     window::PrimaryWindow,
 };
-use crate::{
+use crate::AppState;
+use crate::game::{
     bullet::{
         Bullet,
         BulletShotEvent,
@@ -35,10 +36,8 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_event::<PlayerEvent>()
-            .add_systems(Startup, (
-                spawn_camera,
-                spawn_player,
-            ))
+            .add_systems(OnEnter(AppState::InGame), spawn_player)
+            .add_systems(OnExit(AppState::InGame), despawn_player)
             .add_systems(Update, (
                 player_movement,
                 player_shoot,
@@ -46,7 +45,7 @@ impl Plugin for PlayerPlugin {
                 check_collision_with_enemy,
                 check_collision_with_bullet,
                 listen_player_event,
-            ))
+            ).run_if(in_state(AppState::InGame)))
             ;
     }
 }
@@ -79,18 +78,13 @@ fn spawn_player(
     ));
 }
 
-fn spawn_camera(
+fn despawn_player(
     mut commands: Commands,
-    window_query: Query<&Window, With<PrimaryWindow>>,
+    player_query: Query<Entity, With<Player>>,
 ) {
-    let window = window_query.get_single().unwrap();
-
-    commands.spawn(
-        Camera2dBundle {
-            transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
-            ..default()
-        }
-    );
+    if let Ok(player_entity) = player_query.get_single() {
+        commands.entity(player_entity).despawn();
+    }
 }
 
 fn player_movement(
