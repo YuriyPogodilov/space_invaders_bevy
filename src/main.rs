@@ -1,6 +1,7 @@
 mod game;
 mod sound;
 mod main_menu;
+mod game_over_screen;
 
 use bevy::{
     prelude::*, 
@@ -10,6 +11,7 @@ use bevy::{
 use game::{player::PlayerEvent, GamePlugin};
 use sound::SoundPlugin;
 use main_menu::MainMenuPlugin;
+use game_over_screen::GameOverPlugin;
 
 fn main() {
     let app_window = Some(Window {
@@ -28,12 +30,12 @@ fn main() {
         .add_plugins(SoundPlugin)
         .add_plugins(GamePlugin)
         .add_plugins(MainMenuPlugin)
+        .add_plugins(GameOverPlugin)
         .add_systems(Startup, spawn_camera)
         .add_systems(Update, (
             transition_to_game_state,
             transition_to_main_menu,
             handle_game_over,
-            exit_game,
         ))
         .run();
 }
@@ -92,14 +94,5 @@ fn handle_game_over(
         match event {
             PlayerEvent::Died => next_app_state.set(AppState::GameOver),
         }
-    }
-}
-
-fn exit_game(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut app_exit_event_writer: EventWriter<AppExit>,
-) {
-    if keyboard_input.just_pressed(KeyCode::Escape) {
-        app_exit_event_writer.send(AppExit::Success);
     }
 }
