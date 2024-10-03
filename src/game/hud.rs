@@ -2,8 +2,8 @@ use bevy::{
     color::palettes::css::YELLOW, 
     prelude::*,
 };
-
 use crate::AppState;
+use super::game_mode::GameModeEvent;
 
 pub struct HUDPlugin;
 
@@ -12,6 +12,7 @@ impl Plugin for HUDPlugin {
         app
             .add_systems(OnEnter(AppState::InGame), spawn_hud)
             .add_systems(OnExit(AppState::InGame), despawn_hud)
+            .add_systems(Update, listen_game_mode_event.run_if(in_state(AppState::InGame)))
         ;
     }
 }
@@ -23,7 +24,7 @@ struct GameHUD;
 struct ScoreLabel;
 
 #[derive(Component)]
-struct HighScoreLabel;
+struct HighestScoreLabel;
 
 #[derive(Component)]
 struct WaveLabel;
@@ -38,20 +39,23 @@ fn spawn_hud(
     };
     let text_style = TextStyle {
         font: asset_server.load("fonts/digital-7.ttf"),
-        font_size: 24.0,
+        font_size: 18.0,
         color: YELLOW.into()
     };
 
-    commands.spawn(NodeBundle{
-        style: Style {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            justify_content: JustifyContent::SpaceBetween,
-            align_items: AlignItems::Start,
+    commands.spawn((
+        NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Start,
+                ..default()
+            },
             ..default()
         },
-        ..default()
-    }).with_children(|parent| {
+        GameHUD,
+    )).with_children(|parent| {
         parent.spawn((
             TextBundle::from_section("Score: 00", text_style.clone())
                 .with_style(text_bundle_style.clone()),
@@ -65,7 +69,7 @@ fn spawn_hud(
         parent.spawn((
             TextBundle::from_section("Highest: 00", text_style.clone())
                 .with_style(text_bundle_style.clone()),
-            HighScoreLabel
+            HighestScoreLabel
         ));
     });
 }
@@ -76,5 +80,28 @@ fn despawn_hud(
 ) {
     if let Ok(hud_entity) = hud_query.get_single() {
         commands.entity(hud_entity).despawn_recursive();
+    }
+}
+
+fn listen_game_mode_event(
+    mut game_mode_event_reader: EventReader<GameModeEvent>,
+    mut labels: ParamSet<(
+        Query<&mut Text, With<ScoreLabel>>,
+        Query<&mut Text, With<HighestScoreLabel>>,
+        Query<&mut Text, With<WaveLabel>>,
+    )>,
+) {
+    for event in game_mode_event_reader.read() {
+        match event {
+            GameModeEvent::ScoreChanged(new_score) => {
+                labels.p0().single_mut().sections[0].value = format!("Score: {new_score:02.}")
+            }
+            GameModeEvent::HighestScoreChanged(new_highest_score) => {
+                labels.p1().single_mut().sections[0].value = format!("Highest: {new_highest_score:02.}")
+            }
+            GameModeEvent::WaveChanged(new_wave) => {
+                labels.p2().single_mut().sections[0].value = format!("Wave: {new_wave:02.}")
+            }
+        }
     }
 }
