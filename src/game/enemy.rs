@@ -18,11 +18,16 @@ use crate::game::{
     }, 
     player::Player,
 };
+use super::game_mode::{
+    GameModeEvent,
+    GameModeData,
+};
 
 const ENEMIES_PER_WAVE: u32 = 16;
 const ENEMIES_PER_ROW: u32 = 8;
 const ENEMY_SIZE: f32 = 64.0;
-const ENEMY_SPEED: f32 = 200.0;
+const ENEMY_SPEED_INITIAL: f32 = 200.0;
+const ENEMY_SPEED_INCREMENT: f32 = 50.0;
 const KAMIKAZE_TIMER: f32 = 5.0;
 const SHOOTING_TIMER: f32 = 3.0;
 pub const ENEMY_COLLIDER_RADIUS: f32 = 25.0;
@@ -35,7 +40,7 @@ impl Plugin for EnemyPlugin {
             .init_resource::<KamikazeTimer>()
             .init_resource::<ShootingTimer>()
             .add_event::<EnemyEvent>()
-            .add_systems(OnEnter(AppState::InGame), spawn_enemies)
+            .add_systems(OnEnter(AppState::InGame), start_game)
             .add_systems(OnExit(AppState::InGame), despawn_enemies)
             .add_systems(Update, (
                 enemy_movement,
@@ -45,6 +50,7 @@ impl Plugin for EnemyPlugin {
                 back_to_idle,
                 check_collision_with_bullet,
                 listen_enemy_event,
+                listen_game_mode_event,
             ).run_if(in_state(AppState::InGame)))
             ;
     }
@@ -114,25 +120,12 @@ impl EnemyBundle {
     }
 }
 
-fn spawn_enemies(
+fn start_game(
     mut commands: Commands,
     window_query: Query<&Window, With<PrimaryWindow>>,
     asset_server: Res<AssetServer>,
 ) {
-    let window = window_query.get_single().unwrap();
-    let begin_x = window.width() / 2.0 - (ENEMY_SIZE * (2 * ENEMIES_PER_ROW - 1) as f32) / 2.0;
-    let begin_y = window.height() - 2.0 * ENEMY_SIZE;
-
-    for n in 0..ENEMIES_PER_WAVE {
-        let row = n / ENEMIES_PER_ROW;
-        let x = begin_x + 2.0 * ENEMY_SIZE * (n - ENEMIES_PER_ROW * row) as f32;
-        let y = begin_y - ENEMY_SIZE * row as f32;
-        commands.spawn(
-            EnemyBundle::new(
-                Vec2::new(x, y), 
-                asset_server.load("sprites/enemy.png")
-            ));
-    }
+    spawn_enemies(&mut commands, &window_query, &asset_server);
 }
 
 fn despawn_enemies(
@@ -147,10 +140,12 @@ fn despawn_enemies(
 fn enemy_movement(
     mut enemy_query: Query<(&mut Transform, &Enemy)>,
     time: Res<Time>,
+    game_mode_data: Res<GameModeData>,
 ) {
     for (mut transform, enemy) in enemy_query.iter_mut() {
         if enemy.direction != Vec2::ZERO {
-            transform.translation += enemy.direction.extend(0.0) * ENEMY_SPEED * time.delta_seconds();
+            let speed = ENEMY_SPEED_INITIAL + ENEMY_SPEED_INCREMENT * (game_mode_data.wave as f32);
+            transform.translation += enemy.direction.extend(0.0) * speed * time.delta_seconds();
         }
     }
 }
@@ -270,5 +265,42 @@ fn listen_enemy_event(
                 commands.entity(*entity).despawn();
             },
         }
+    }
+}
+
+fn listen_game_mode_event(
+    mut game_mode_event_reader: EventReader<GameModeEvent>,
+    mut commands: Commands,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    asset_server: Res<AssetServer>,
+) {
+    for event in game_mode_event_reader.read() {
+        match event {
+            GameModeEvent::WaveChanged(_) => {
+                spawn_enemies(&mut commands, &window_query, &asset_server);
+            },
+            _ => ()
+        }
+    }
+}
+
+fn spawn_enemies(
+    commands: &mut Commands,
+    window_query: &Query<&Window, With<PrimaryWindow>>,
+    asset_server: &Res<AssetServer>,
+) {
+    let window = window_query.get_single().unwrap();
+    let begin_x = window.width() / 2.0 - (ENEMY_SIZE * (2 * ENEMIES_PER_ROW - 1) as f32) / 2.0;
+    let begin_y = window.height() - 2.0 * ENEMY_SIZE;
+
+    for n in 0..ENEMIES_PER_WAVE {
+        let row = n / ENEMIES_PER_ROW;
+        let x = begin_x + 2.0 * ENEMY_SIZE * (n - ENEMIES_PER_ROW * row) as f32;
+        let y = begin_y - ENEMY_SIZE * row as f32;
+        commands.spawn(
+            EnemyBundle::new(
+                Vec2::new(x, y), 
+                asset_server.load("sprites/enemy.png")
+            ));
     }
 }

@@ -20,10 +20,10 @@ impl Plugin for GameModePlugin {
 }
 
 #[derive(Resource, Default)]
-struct GameModeData {
+pub struct GameModeData {
     score: u32,
     highest_score: u32,
-    wave: u8
+    pub wave: u8
 }
 
 #[derive(Event)]
