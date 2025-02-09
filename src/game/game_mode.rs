@@ -25,8 +25,8 @@ impl Plugin for GameModePlugin {
 
 #[derive(Resource, Default)]
 pub struct GameModeData {
-    score: u32,
-    highest_score: u32,
+    pub score: u32,
+    pub highest_score: u32,
     pub wave: u8
 }
 

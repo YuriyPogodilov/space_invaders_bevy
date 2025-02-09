@@ -3,7 +3,10 @@ use bevy::{
     prelude::*,
 };
 use crate::AppState;
-use super::game_mode::GameModeEvent;
+use super::game_mode::{
+    GameModeData, 
+    GameModeEvent,
+};
 
 pub struct HUDPlugin;
 
@@ -31,6 +34,7 @@ struct WaveLabel;
 
 fn spawn_hud(
     mut commands: Commands,
+    game_mode_data: Res<GameModeData>,
     asset_server: Res<AssetServer>,
 ) {
     let text_bundle_style = Style {
@@ -57,17 +61,17 @@ fn spawn_hud(
         GameHUD,
     )).with_children(|parent| {
         parent.spawn((
-            TextBundle::from_section("Score: 00", text_style.clone())
+            TextBundle::from_section(format!("Score: {:02}", game_mode_data.score), text_style.clone())
                 .with_style(text_bundle_style.clone()),
             ScoreLabel
         ));
         parent.spawn((
-            TextBundle::from_section("Wave: 00", text_style.clone())
+            TextBundle::from_section(format!("Wave: {:02}", game_mode_data.wave), text_style.clone())
                 .with_style(text_bundle_style.clone()),
             WaveLabel
         ));
         parent.spawn((
-            TextBundle::from_section("Highest: 00", text_style.clone())
+            TextBundle::from_section(format!("Highest: {:02}", game_mode_data.highest_score), text_style.clone())
                 .with_style(text_bundle_style.clone()),
             HighestScoreLabel
         ));
