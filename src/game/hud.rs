@@ -94,13 +94,13 @@ fn listen_game_mode_event(
     for event in game_mode_event_reader.read() {
         match event {
             GameModeEvent::ScoreChanged(new_score) => {
-                labels.p0().single_mut().sections[0].value = format!("Score: {new_score:02.}")
+                labels.p0().single_mut().sections[0].value = format!("Score: {new_score:02}")
             }
             GameModeEvent::HighestScoreChanged(new_highest_score) => {
-                labels.p1().single_mut().sections[0].value = format!("Highest: {new_highest_score:02.}")
+                labels.p1().single_mut().sections[0].value = format!("Highest: {new_highest_score:02}")
             }
             GameModeEvent::WaveChanged(new_wave) => {
-                labels.p2().single_mut().sections[0].value = format!("Wave: {new_wave:02.}")
+                labels.p2().single_mut().sections[0].value = format!("Wave: {new_wave:02}")
             }
         }
     }
