@@ -1,8 +1,11 @@
 use bevy::prelude::*;
 use crate::AppState;
-use super::enemy::{
-    Enemy,
-    EnemyEvent,
+use super::{
+    enemy::{
+        Enemy,
+        EnemyEvent,
+    }, 
+    player::PlayerEvent,
 };
 
 pub struct GameModePlugin;
@@ -14,6 +17,7 @@ impl Plugin for GameModePlugin {
             .add_event::<GameModeEvent>()
             .add_systems(Update, (
                 listen_enemy_event,
+                listen_player_event,
             ).run_if(in_state(AppState::InGame)))
         ;
     }
@@ -54,6 +58,24 @@ fn listen_enemy_event(
                     game_mode_data.wave += 1;
                     game_mode_event_writer.send(GameModeEvent::WaveChanged(game_mode_data.wave));
                 }
+            }
+        }
+    }
+}
+
+fn listen_player_event(
+    mut player_event_reader: EventReader<PlayerEvent>,
+    mut game_mode_data: ResMut<GameModeData>,
+    mut game_mode_event_writer: EventWriter<GameModeEvent>,
+) {
+    for event in player_event_reader.read() {
+        match event {
+            PlayerEvent::Died => {
+                game_mode_data.score = 0;
+                game_mode_event_writer.send(GameModeEvent::ScoreChanged(game_mode_data.score));
+
+                game_mode_data.wave = 0;
+                game_mode_event_writer.send(GameModeEvent::WaveChanged(game_mode_data.wave));
             }
         }
     }
